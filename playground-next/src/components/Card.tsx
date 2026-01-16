@@ -13,6 +13,7 @@ export function Card() {
 
   return (
     <div
+      {...styles.tangentProps}
       style={{
         borderRadius: `${styles.borderRadius}px`,
         background: styles.cardGradient,
