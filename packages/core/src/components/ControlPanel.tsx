@@ -123,6 +123,7 @@ export function ControlPanel() {
     resetSection,
     isSaving,
     highlightedId,
+    setHighlightedId,
   } = useTangentContext();
 
   const [collapsed, setCollapsed] = useState(false);
@@ -329,20 +330,7 @@ export function ControlPanel() {
       }}
       data-tangent-panel
     >
-      <div
-        style={{
-          ...styles.sectionHeader,
-          backgroundColor: isHighlighted
-            ? "rgba(0, 255, 159, 0.25)"
-            : "rgba(0, 255, 159, 0.05)",
-          borderColor: isHighlighted
-            ? "rgba(0, 255, 159, 0.6)"
-            : "rgba(0, 255, 159, 0.1)",
-          boxShadow: isHighlighted ? "0 0 15px rgba(0, 255, 159, 0.2)" : "none",
-          transform: isHighlighted ? "translateX(4px)" : "none",
-        }}
-        onMouseDown={handleMouseDown}
-      >
+      <div style={styles.header} onMouseDown={handleMouseDown}>
         <div style={styles.logo}>
           <span style={styles.logoIcon}>◈</span>
           {!collapsed && <span style={styles.logoText}>TANGENT</span>}
@@ -517,6 +505,8 @@ export function ControlPanel() {
                           transform: isHighlighted ? "translateX(4px)" : "none",
                         }}
                         onClick={() => toggleSection(id)}
+                        onMouseEnter={() => setHighlightedId(id)}
+                        onMouseLeave={() => setHighlightedId(null)}
                         title={
                           isCollapsed ? "Expand section" : "Collapse section"
                         }

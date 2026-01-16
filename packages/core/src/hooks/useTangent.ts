@@ -13,10 +13,14 @@ export function useTangent<T extends TangentConfig>(
   id: string,
   defaultValues: T,
   options: UseTangentOptions = {},
-): T & { tangentProps: { "data-tangent-id": string } } {
+): T & { tangentProps: { "data-tangent-id": string }; tangentId: string } {
   // Production: return default values directly (zero overhead)
   if (!isDev) {
-    return { ...defaultValues, tangentProps: { "data-tangent-id": id } };
+    return {
+      ...defaultValues,
+      tangentProps: { "data-tangent-id": id },
+      tangentId: id,
+    };
   }
 
   return useTangentDev(id, defaultValues, options);
@@ -26,7 +30,7 @@ function useTangentDev<T extends TangentConfig>(
   id: string,
   defaultValues: T,
   options: UseTangentOptions,
-): T & { tangentProps: { "data-tangent-id": string } } {
+): T & { tangentProps: { "data-tangent-id": string }; tangentId: string } {
   const { register, unregister, endpoint } = useTangentContext();
 
   const storedConfig = getStoredConfig(id);
@@ -87,8 +91,11 @@ function useTangentDev<T extends TangentConfig>(
     return () => unregister(id);
   }, [id, register, unregister, handleUpdate, handleSave]);
 
+  const tangentProps = { "data-tangent-id": id };
+
   return {
     ...values,
-    tangentProps: { "data-tangent-id": id },
+    tangentProps,
+    tangentId: id,
   };
 }

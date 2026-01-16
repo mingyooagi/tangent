@@ -21,7 +21,6 @@ export function SpacingOverlay({ enabled }: SpacingOverlayProps) {
   const handleMouseMove = useCallback((e: MouseEvent) => {
     const target = e.target as HTMLElement;
 
-    // Ignore our own overlay elements and the control panel
     if (
       target.closest("[data-tangent-overlay]") ||
       target.closest("[data-tangent-panel]")
@@ -32,11 +31,9 @@ export function SpacingOverlay({ enabled }: SpacingOverlayProps) {
     const rect = target.getBoundingClientRect();
     const styles = window.getComputedStyle(target);
 
-    // Get the Tangent ID from the element or its closest parent
     const tangentId = target
       .closest("[data-tangent-id]")
       ?.getAttribute("data-tangent-id");
-
     const scaleX = target.offsetWidth > 0 ? rect.width / target.offsetWidth : 1;
     const scaleY =
       target.offsetHeight > 0 ? rect.height / target.offsetHeight : 1;
@@ -70,7 +67,6 @@ export function SpacingOverlay({ enabled }: SpacingOverlayProps) {
     setHighlightedId(null);
   }, [setHighlightedId]);
 
-  // Update highlighted ID when hovered element changes
   useEffect(() => {
     if (hoveredElement?.id) {
       setHighlightedId(hoveredElement.id);
@@ -78,7 +74,6 @@ export function SpacingOverlay({ enabled }: SpacingOverlayProps) {
       setHighlightedId(null);
     }
   }, [hoveredElement?.id, setHighlightedId]);
-
   useEffect(() => {
     if (!enabled) {
       setHoveredElement(null);

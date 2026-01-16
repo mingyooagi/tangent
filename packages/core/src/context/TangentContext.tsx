@@ -17,6 +17,7 @@ import type {
 } from "../types";
 import { ControlPanel } from "../components/ControlPanel";
 import { SpacingOverlay } from "../components/SpacingOverlay";
+import { HighlightOverlay } from "../components/HighlightOverlay";
 import { ResponsivePreview } from "../components/ResponsivePreview";
 import { getStoredConfig, setStoredConfig, updateStoredConfig } from "../store";
 import {
@@ -388,6 +389,7 @@ function TangentProviderDev({ children, endpoint }: TangentProviderProps) {
         {children}
       </ResponsivePreview>
       {isOpen && registrations.size > 0 && <ControlPanel />}
+      <HighlightOverlay />
       <SpacingOverlay enabled={showSpacing} />
     </TangentContext.Provider>
   );

@@ -1,6 +1,6 @@
 "use client";
 
-import { useTangent } from "tangent-core";
+import { useTangent, TangentRoot } from "tangent-core";
 
 export function Card() {
   const styles = useTangent("CardComponent", {
@@ -12,8 +12,8 @@ export function Card() {
   });
 
   return (
-    <div
-      {...styles.tangentProps}
+    <TangentRoot
+      tangent={styles}
       style={{
         borderRadius: `${styles.borderRadius}px`,
         background: styles.cardGradient,
@@ -27,6 +27,6 @@ export function Card() {
         Adjust the styling of this card using the Tangent control panel. Try the
         new BoxShadow and Gradient editors!
       </p>
-    </div>
+    </TangentRoot>
   );
 }

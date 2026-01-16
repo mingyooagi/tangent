@@ -1,6 +1,6 @@
 "use client";
 
-import { useTangent } from "tangent-core";
+import { useTangent, TangentRoot } from "tangent-core";
 
 export function Hero() {
   const styles = useTangent("HeroSection", {
@@ -14,7 +14,8 @@ export function Hero() {
   });
 
   return (
-    <div
+    <TangentRoot
+      tangent={styles}
       style={{
         padding: `${styles.padding}px`,
         textAlign: "center",
@@ -38,6 +39,6 @@ export function Hero() {
       <p style={{ color: "#888", fontSize: "18px" }}>
         Visual Tuner for AI-Generated Code (Next.js)
       </p>
-    </div>
+    </TangentRoot>
   );
 }
