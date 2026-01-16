@@ -5,8 +5,23 @@ interface CodePreviewProps {
   registrations: Map<string, TangentRegistration>
 }
 
+type ViewMode = 'diff' | 'css'
+
+function toKebabCase(str: string): string {
+  return str.replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase()
+}
+
+function formatCSSValue(key: string, value: unknown): string {
+  if (typeof value === 'number') {
+    const needsUnit = !['opacity', 'fontWeight', 'zIndex', 'lineHeight', 'flex', 'order'].includes(key)
+    return needsUnit ? `${value}px` : String(value)
+  }
+  return String(value)
+}
+
 export function CodePreview({ registrations }: CodePreviewProps) {
   const [copied, setCopied] = useState(false)
+  const [viewMode, setViewMode] = useState<ViewMode>('diff')
 
   const generateDiff = (registration: TangentRegistration): DiffLine[] => {
     const { originalConfig, currentConfig } = registration
@@ -55,6 +70,24 @@ export function CodePreview({ registrations }: CodePreviewProps) {
     return `// ${relativePath}\nconst styles = useTangent('${id}', {\n${entries}\n})`
   }
 
+  const generateCSSVariables = (): string => {
+    const lines: string[] = [':root {']
+    
+    Array.from(registrations.values()).forEach(registration => {
+      const { id, currentConfig } = registration
+      const prefix = toKebabCase(id)
+      
+      Object.entries(currentConfig).forEach(([key, value]) => {
+        const varName = `--${prefix}-${toKebabCase(key)}`
+        const cssValue = formatCSSValue(key, value)
+        lines.push(`  ${varName}: ${cssValue};`)
+      })
+    })
+    
+    lines.push('}')
+    return lines.join('\n')
+  }
+
   const getAllCode = (): string => {
     return Array.from(registrations.values())
       .map(generateFullCode)
@@ -63,7 +96,8 @@ export function CodePreview({ registrations }: CodePreviewProps) {
 
   const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(getAllCode())
+      const text = viewMode === 'css' ? generateCSSVariables() : getAllCode()
+      await navigator.clipboard.writeText(text)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     } catch (err) {
@@ -80,7 +114,28 @@ export function CodePreview({ registrations }: CodePreviewProps) {
   return (
     <div style={styles.container}>
       <div style={styles.header}>
-        <span style={styles.title}>CODE CHANGES</span>
+        <div style={styles.tabs}>
+          <button
+            style={{
+              ...styles.tab,
+              backgroundColor: viewMode === 'diff' ? 'rgba(0, 212, 255, 0.2)' : 'transparent',
+              color: viewMode === 'diff' ? '#00d4ff' : '#666',
+            }}
+            onClick={() => setViewMode('diff')}
+          >
+            Diff
+          </button>
+          <button
+            style={{
+              ...styles.tab,
+              backgroundColor: viewMode === 'css' ? 'rgba(0, 255, 159, 0.2)' : 'transparent',
+              color: viewMode === 'css' ? '#00ff9f' : '#666',
+            }}
+            onClick={() => setViewMode('css')}
+          >
+            CSS Vars
+          </button>
+        </div>
         <button
           style={{
             ...styles.copyButton,
@@ -88,11 +143,15 @@ export function CodePreview({ registrations }: CodePreviewProps) {
           }}
           onClick={handleCopy}
         >
-          {copied ? '✓ Copied' : 'Copy Prompt'}
+          {copied ? '✓ Copied' : 'Copy'}
         </button>
       </div>
 
-      {!hasChanges ? (
+      {viewMode === 'css' ? (
+        <div style={styles.cssContainer}>
+          <pre style={styles.cssCode}>{generateCSSVariables()}</pre>
+        </div>
+      ) : !hasChanges ? (
         <div style={styles.noChanges}>No changes yet</div>
       ) : (
         <div style={styles.diffContainer}>
@@ -167,13 +226,22 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: '10px 12px',
+    padding: '8px 12px',
   },
-  title: {
+  tabs: {
+    display: 'flex',
+    gap: '4px',
+  },
+  tab: {
+    background: 'transparent',
+    border: 'none',
+    borderRadius: '4px',
+    cursor: 'pointer',
+    padding: '4px 8px',
     fontSize: '10px',
+    fontFamily: 'inherit',
     fontWeight: 600,
-    letterSpacing: '1px',
-    color: '#00d4ff',
+    transition: 'all 0.2s',
   },
   copyButton: {
     background: 'transparent',
@@ -192,6 +260,21 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '11px',
     textAlign: 'center',
     fontStyle: 'italic',
+  },
+  cssContainer: {
+    padding: '0 12px 12px',
+  },
+  cssCode: {
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    borderRadius: '6px',
+    padding: '12px',
+    fontSize: '11px',
+    fontFamily: 'inherit',
+    overflow: 'auto',
+    margin: 0,
+    color: '#00ff9f',
+    whiteSpace: 'pre-wrap',
+    wordBreak: 'break-all',
   },
   diffContainer: {
     padding: '0 12px 12px',

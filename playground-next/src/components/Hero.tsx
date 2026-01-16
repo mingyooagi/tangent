@@ -4,10 +4,12 @@ import { useTangent } from 'tangent-core'
 
 export function Hero() {
   const styles = useTangent('HeroSection', {
-    padding: 409,
-    headerColor: '#ff6b6b',
-    fontSize: 190,
-    opacity: 305,
+    padding: 80,
+    headerColor: '#00ff9f',
+    fontSize: 48,
+    opacity: 1,
+    heroGradient: 'radial-gradient(circle, rgba(0, 255, 159, 0.15) 0%, rgba(0, 212, 255, 0.1) 50%, transparent 100%)',
+    titleShadow: '0px 0px 40px 0px rgba(0, 255, 159, 0.4)',
   })
 
   return (
@@ -15,7 +17,7 @@ export function Hero() {
       style={{
         padding: `${styles.padding}px`,
         textAlign: 'center',
-        background: 'linear-gradient(180deg, rgba(0, 255, 159, 0.1) 0%, transparent 100%)',
+        background: styles.heroGradient,
         borderRadius: '16px',
         border: '1px solid rgba(0, 255, 159, 0.2)',
       }}
@@ -26,7 +28,7 @@ export function Hero() {
           fontSize: `${styles.fontSize}px`,
           fontWeight: 700,
           opacity: styles.opacity,
-          textShadow: `0 0 40px ${styles.headerColor}40`,
+          textShadow: styles.titleShadow,
           marginBottom: '16px',
         }}
       >

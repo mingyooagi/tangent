@@ -1,6 +1,8 @@
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react'
-import type { TangentContextValue, TangentRegistration, TangentValue, HistoryState } from '../types'
+import type { TangentContextValue, TangentRegistration, TangentValue, HistoryState, ViewportSize } from '../types'
 import { ControlPanel } from '../components/ControlPanel'
+import { SpacingOverlay } from '../components/SpacingOverlay'
+import { ResponsivePreview } from '../components/ResponsivePreview'
 import { getStoredConfig, setStoredConfig, updateStoredConfig } from '../store'
 import { pushHistory, undo as undoHistory, redo as redoHistory, getHistoryState } from '../history'
 
@@ -24,6 +26,10 @@ const prodContextValue: TangentContextValue = {
   setIsOpen: noopFn,
   showCode: false,
   setShowCode: noopFn,
+  showSpacing: false,
+  setShowSpacing: noopFn,
+  viewport: 'full',
+  setViewport: noopFn,
   endpoint: '',
   historyState: { canUndo: false, canRedo: false },
   undo: noopFn,
@@ -42,6 +48,8 @@ function TangentProviderDev({ children, endpoint }: TangentProviderProps) {
   const [registrations, setRegistrations] = useState<Map<string, TangentRegistration>>(new Map())
   const [isOpen, setIsOpen] = useState(true)
   const [showCode, setShowCode] = useState(false)
+  const [showSpacing, setShowSpacing] = useState(false)
+  const [viewport, setViewport] = useState<ViewportSize>('full')
   const [historyState, setHistoryState] = useState<HistoryState>({ canUndo: false, canRedo: false })
 
   const updateHistoryState = useCallback(() => {
@@ -148,12 +156,14 @@ function TangentProviderDev({ children, endpoint }: TangentProviderProps) {
         e.preventDefault()
         setIsOpen(prev => !prev)
       }
-      // Undo: Cmd+Z / Ctrl+Z
+      if (e.key === 's' && (e.metaKey || e.ctrlKey) && e.shiftKey) {
+        e.preventDefault()
+        setShowSpacing(prev => !prev)
+      }
       if (e.key === 'z' && (e.metaKey || e.ctrlKey) && !e.shiftKey) {
         e.preventDefault()
         undo()
       }
-      // Redo: Cmd+Shift+Z / Ctrl+Shift+Z
       if (e.key === 'z' && (e.metaKey || e.ctrlKey) && e.shiftKey) {
         e.preventDefault()
         redo()
@@ -173,6 +183,10 @@ function TangentProviderDev({ children, endpoint }: TangentProviderProps) {
     setIsOpen,
     showCode,
     setShowCode,
+    showSpacing,
+    setShowSpacing,
+    viewport,
+    setViewport,
     endpoint: endpoint!,
     historyState,
     undo,
@@ -181,8 +195,11 @@ function TangentProviderDev({ children, endpoint }: TangentProviderProps) {
 
   return (
     <TangentContext.Provider value={contextValue}>
-      {children}
+      <ResponsivePreview enabled={viewport !== 'full'} viewport={viewport} onViewportChange={setViewport}>
+        {children}
+      </ResponsivePreview>
       {isOpen && registrations.size > 0 && <ControlPanel />}
+      <SpacingOverlay enabled={showSpacing} />
     </TangentContext.Provider>
   )
 }

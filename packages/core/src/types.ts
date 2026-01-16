@@ -22,6 +22,8 @@ export interface HistoryState {
   canRedo: boolean
 }
 
+export type ViewportSize = 'mobile' | 'tablet' | 'desktop' | 'full'
+
 export interface TangentContextValue {
   registrations: Map<string, TangentRegistration>
   register: (registration: TangentRegistration) => void
@@ -31,6 +33,10 @@ export interface TangentContextValue {
   setIsOpen: (open: boolean) => void
   showCode: boolean
   setShowCode: (show: boolean) => void
+  showSpacing: boolean
+  setShowSpacing: (show: boolean) => void
+  viewport: ViewportSize
+  setViewport: (viewport: ViewportSize) => void
   endpoint: string
   historyState: HistoryState
   undo: () => void
