@@ -331,8 +331,15 @@ export function ControlPanel() {
     >
       <div
         style={{
-          ...styles.header,
-          cursor: isDragging ? "grabbing" : "grab",
+          ...styles.sectionHeader,
+          backgroundColor: isHighlighted
+            ? "rgba(0, 255, 159, 0.25)"
+            : "rgba(0, 255, 159, 0.05)",
+          borderColor: isHighlighted
+            ? "rgba(0, 255, 159, 0.6)"
+            : "rgba(0, 255, 159, 0.1)",
+          boxShadow: isHighlighted ? "0 0 15px rgba(0, 255, 159, 0.2)" : "none",
+          transform: isHighlighted ? "translateX(4px)" : "none",
         }}
         onMouseDown={handleMouseDown}
       >
@@ -490,12 +497,25 @@ export function ControlPanel() {
                   registration.currentConfig,
                 ).length;
                 const unsavedCount = getUnsavedCountForSection(id);
+                const isHighlighted = highlightedId === id;
 
                 return (
                   <div key={id} style={styles.section}>
                     <div style={styles.sectionHeaderRow}>
                       <button
-                        style={styles.sectionHeader}
+                        style={{
+                          ...styles.sectionHeader,
+                          backgroundColor: isHighlighted
+                            ? "rgba(0, 255, 159, 0.25)"
+                            : "rgba(0, 255, 159, 0.05)",
+                          borderColor: isHighlighted
+                            ? "rgba(0, 255, 159, 0.6)"
+                            : "rgba(0, 255, 159, 0.1)",
+                          boxShadow: isHighlighted
+                            ? "0 0 15px rgba(0, 255, 159, 0.2)"
+                            : "none",
+                          transform: isHighlighted ? "translateX(4px)" : "none",
+                        }}
                         onClick={() => toggleSection(id)}
                         title={
                           isCollapsed ? "Expand section" : "Collapse section"
