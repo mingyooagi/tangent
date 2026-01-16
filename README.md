@@ -2,12 +2,12 @@
 
 Visual Tuner for AI-generated code. Adjust UI values in the browser and save changes directly to source files.
 
-![Tangent Demo](https://via.placeholder.com/800x400?text=Tangent+Demo)
+![Tangent Demo](./tangent-panel.png)
 
 ## Features
 
 - 🎛️ **Visual Controls** - Sliders, color pickers, gradient editors, box-shadow editors, and more
-- 💾 **Auto-save to Source** - Changes are written back to your source files via AST modification
+- 💾 **Save to Source** - Click Save or ⌘S to write changes back to source files via AST modification
 - ⚡ **Hot Reload** - See changes instantly in the browser
 - 🎨 **Cyberpunk Theme** - Dark mode UI that stays out of your way
 - 📋 **Copy Prompt** - Copy changes in AI-friendly format
@@ -188,6 +188,8 @@ Click the `</>` button to open the code preview panel:
 
 - **Diff tab** - Shows changes as a diff from original values
 - **CSS Vars tab** - Exports all values as CSS custom properties
+
+![CSS Variables Export](./tangent-css-vars.png)
 
 ```css
 :root {
