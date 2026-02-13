@@ -118,30 +118,43 @@ export function tangent(options: TangentPluginOptions = {}): Plugin {
           return
         }
 
-        // ── New: SSE event stream (for MCP real-time) ─────────
-        if (req.url === '/__tangent/events' && req.method === 'GET') {
-          res.statusCode = 200
-          res.setHeader('Content-Type', 'text/event-stream')
-          res.setHeader('Cache-Control', 'no-cache')
-          res.setHeader('Connection', 'keep-alive')
-          res.setHeader('Access-Control-Allow-Origin', '*')
+        // ── SSE event stream OR JSON polling (for MCP) ────────
+        if (req.url?.startsWith('/__tangent/events') && req.method === 'GET') {
+          const urlObj = new URL(req.url, 'http://localhost')
+          const sinceParam = urlObj.searchParams.get('since')
 
-          // Send initial connected event
-          res.write(`data: ${JSON.stringify({ type: 'connected', timestamp: Date.now() })}\n\n`)
+          if (sinceParam !== null) {
+            // JSON polling: return events since sequence N
+            const sinceSeq = parseInt(sinceParam, 10) || 0
+            const events = store.getEvents(sinceSeq)
+            res.statusCode = 200
+            res.setHeader('Content-Type', 'application/json')
+            res.setHeader('Access-Control-Allow-Origin', '*')
+            res.end(JSON.stringify(events))
+          } else {
+            // SSE stream: real-time event push
+            res.statusCode = 200
+            res.setHeader('Content-Type', 'text/event-stream')
+            res.setHeader('Cache-Control', 'no-cache')
+            res.setHeader('Connection', 'keep-alive')
+            res.setHeader('Access-Control-Allow-Origin', '*')
 
-          const unsubscribe = store.onEvent((event) => {
-            res.write(`id: ${event.sequence}\n`)
-            res.write(`event: ${event.type}\n`)
-            res.write(`data: ${JSON.stringify(event)}\n\n`)
-          })
+            res.write(`data: ${JSON.stringify({ type: 'connected', timestamp: Date.now() })}\n\n`)
 
-          req.on('close', () => {
-            unsubscribe()
-          })
+            const unsubscribe = store.onEvent((event) => {
+              res.write(`id: ${event.sequence}\n`)
+              res.write(`event: ${event.type}\n`)
+              res.write(`data: ${JSON.stringify(event)}\n\n`)
+            })
+
+            req.on('close', () => {
+              unsubscribe()
+            })
+          }
           return
         }
 
-        // ── New: Post event from browser ──────────────────────
+        // ── Post event from browser or agent ──────────────────
         if (req.url === '/__tangent/events' && req.method === 'POST') {
           const body = await readBody(req)
           try {
@@ -175,10 +188,70 @@ export function tangent(options: TangentPluginOptions = {}): Plugin {
           return
         }
 
-        if (req.url === '/__tangent/suggestions' && req.method === 'GET') {
+        if (req.url?.startsWith('/__tangent/suggestions') && req.method === 'GET') {
+          const urlObj = new URL(req.url, 'http://localhost')
+          const status = urlObj.searchParams.get('status') as 'pending' | 'accepted' | 'rejected' | null
           res.statusCode = 200
           res.setHeader('Content-Type', 'application/json')
-          res.end(JSON.stringify(store.getSuggestions()))
+          res.end(JSON.stringify(store.getSuggestions(status || undefined)))
+          return
+        }
+
+        // ── PATCH suggestion status (accept/reject) ───────────
+        if (req.url?.startsWith('/__tangent/suggestions/') && req.method === 'PATCH') {
+          const id = decodeURIComponent(req.url.replace('/__tangent/suggestions/', ''))
+          const body = await readBody(req)
+          try {
+            const { status } = JSON.parse(body) as { status: 'accepted' | 'rejected' }
+            if (status !== 'accepted' && status !== 'rejected') {
+              res.statusCode = 400
+              res.setHeader('Content-Type', 'application/json')
+              res.end(JSON.stringify({ error: 'Status must be "accepted" or "rejected"' }))
+              return
+            }
+            const updated = store.updateSuggestionStatus(id, status)
+            if (updated) {
+              res.statusCode = 200
+              res.setHeader('Content-Type', 'application/json')
+              res.end(JSON.stringify({ success: true }))
+            } else {
+              res.statusCode = 404
+              res.setHeader('Content-Type', 'application/json')
+              res.end(JSON.stringify({ error: `Suggestion '${id}' not found` }))
+            }
+          } catch {
+            res.statusCode = 400
+            res.setHeader('Content-Type', 'application/json')
+            res.end(JSON.stringify({ error: 'Invalid PATCH body' }))
+          }
+          return
+        }
+
+        // ── Agent-triggered inspect ───────────────────────────
+        if (req.url === '/__tangent/inspect' && req.method === 'POST') {
+          const body = await readBody(req)
+          try {
+            const { selector } = JSON.parse(body) as { selector: string }
+            if (!selector) {
+              res.statusCode = 400
+              res.setHeader('Content-Type', 'application/json')
+              res.end(JSON.stringify({ error: 'Missing "selector" field' }))
+              return
+            }
+            // Record as event so browser SSE picks it up
+            store.recordEvent({
+              type: 'inspect.requested',
+              source: 'agent',
+              payload: { selector },
+            })
+            res.statusCode = 200
+            res.setHeader('Content-Type', 'application/json')
+            res.end(JSON.stringify({ success: true, message: 'Inspect request sent to browser' }))
+          } catch {
+            res.statusCode = 400
+            res.setHeader('Content-Type', 'application/json')
+            res.end(JSON.stringify({ error: 'Invalid inspect request' }))
+          }
           return
         }
 

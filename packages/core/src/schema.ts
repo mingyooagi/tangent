@@ -43,11 +43,15 @@ export type TuningEventType =
   | "value.reset"
   | "discovery.inspected";
 
+export type TuningEventSource = "human" | "agent";
+
 export interface TuningEvent {
   type: TuningEventType;
   timestamp: number;
   /** Monotonic sequence number for ordering */
   sequence: number;
+  /** Who initiated this event */
+  source: TuningEventSource;
   payload: TuningEventPayload;
 }
 
@@ -140,11 +144,12 @@ let sequence = 0;
 
 const listeners = new Set<TuningEventListener>();
 
-export function emitTuningEvent(type: TuningEventType, payload: TuningEventPayload): TuningEvent {
+export function emitTuningEvent(type: TuningEventType, payload: TuningEventPayload, source: TuningEventSource = "human"): TuningEvent {
   const event: TuningEvent = {
     type,
     timestamp: Date.now(),
     sequence: ++sequence,
+    source,
     payload,
   };
   listeners.forEach((listener) => {

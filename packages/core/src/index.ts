@@ -21,6 +21,7 @@ export {
 export type {
   TuningEvent,
   TuningEventType,
+  TuningEventSource,
   TuningEventPayload,
   TuningEventListener,
   TuningRegistration as TuningSchemaRegistration,

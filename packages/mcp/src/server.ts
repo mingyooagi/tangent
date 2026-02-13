@@ -180,6 +180,7 @@ export function createTangentMcpServer(options: TangentMcpOptions = {}) {
         method: 'POST',
         body: JSON.stringify({
           type: 'value.changed',
+          source: 'agent',
           payload: {
             id,
             filePath: reg.filePath,
@@ -376,6 +377,87 @@ export function createTangentMcpServer(options: TangentMcpOptions = {}) {
           content: [{
             type: 'text',
             text: `Failed to submit suggestion: ${error instanceof Error ? error.message : String(error)}`,
+          }],
+          isError: true,
+        }
+      }
+    },
+  )
+
+  // ─── Tool: Inspect Element ───────────────────────────────
+
+  server.tool(
+    'tangent_inspect_element',
+    'Inspect a DOM element by CSS selector to discover its tunable properties. ' +
+    'The browser will query the element, extract computed styles, and return suggested properties. ' +
+    'Use this to understand what values an element has before suggesting changes.',
+    {
+      selector: z.string().describe('CSS selector for the element (e.g. ".hero > h1", "#main-cta")'),
+    },
+    async ({ selector }) => {
+      try {
+        // Request the browser to inspect the element
+        await tangentFetch('/__tangent/inspect', {
+          method: 'POST',
+          body: JSON.stringify({ selector }),
+        })
+
+        // Wait for the browser to post back the discovery.inspected event
+        const startTime = Date.now()
+        const timeout = 5000
+        while (Date.now() - startTime < timeout) {
+          await new Promise((resolve) => setTimeout(resolve, 500))
+          try {
+            const events = await tangentFetch(`/__tangent/events?since=0`)
+            if (Array.isArray(events)) {
+              // Find the most recent discovery.inspected event for this selector
+              const inspectEvent = [...events]
+                .reverse()
+                .find((e: any) =>
+                  e.type === 'discovery.inspected' &&
+                  e.source === 'agent' &&
+                  e.payload?.elementPath,
+                )
+              if (inspectEvent && inspectEvent.timestamp > startTime) {
+                const p = inspectEvent.payload as any
+                const propsLines = p.suggestedProperties?.map((sp: any) =>
+                  `  - **${sp.key}**: \`${sp.value}\` (${sp.type})`,
+                ).join('\n') || '  (none detected)'
+
+                return {
+                  content: [{
+                    type: 'text',
+                    text: [
+                      `# Inspected: \`${selector}\``,
+                      `**Element:** \`${p.element}\``,
+                      `**Path:** \`${p.elementPath}\``,
+                      `**Classes:** \`${p.cssClasses || '(none)'}\``,
+                      p.reactComponents ? `**React:** ${p.reactComponents}` : '',
+                      `**Bounding box:** ${p.boundingBox?.width}x${p.boundingBox?.height} at (${Math.round(p.boundingBox?.x)}, ${Math.round(p.boundingBox?.y)})`,
+                      '',
+                      `**Tunable Properties (${p.suggestedProperties?.length || 0}):**`,
+                      propsLines,
+                    ].filter(Boolean).join('\n'),
+                  }],
+                }
+              }
+            }
+          } catch { /* retry */ }
+        }
+
+        return {
+          content: [{
+            type: 'text',
+            text: `Element "${selector}" was not found or the browser did not respond within 5s. ` +
+              `Make sure the selector is valid and the page is loaded.`,
+          }],
+          isError: true,
+        }
+      } catch (error) {
+        return {
+          content: [{
+            type: 'text',
+            text: `Failed to inspect element: ${error instanceof Error ? error.message : String(error)}`,
           }],
           isError: true,
         }
