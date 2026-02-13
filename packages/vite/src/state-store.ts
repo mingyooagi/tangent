@@ -20,6 +20,7 @@ export interface StoredEvent {
   type: string
   timestamp: number
   sequence: number
+  source: 'human' | 'agent'
   payload: Record<string, unknown>
 }
 
@@ -63,11 +64,12 @@ export class TangentStateStore {
 
   // ─── Events ───────────────────────────────────────────
 
-  recordEvent(partial: { type: string; payload: Record<string, unknown> }): StoredEvent {
+  recordEvent(partial: { type: string; payload: Record<string, unknown>; source?: 'human' | 'agent' }): StoredEvent {
     const event: StoredEvent = {
       type: partial.type,
       timestamp: Date.now(),
       sequence: ++this.sequence,
+      source: partial.source || 'human',
       payload: partial.payload,
     }
 

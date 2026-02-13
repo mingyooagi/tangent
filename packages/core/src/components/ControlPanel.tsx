@@ -8,6 +8,7 @@ import { BooleanInput } from "./inputs/BooleanInput";
 import { BoxShadowInput } from "./inputs/BoxShadowInput";
 import { GradientInput } from "./inputs/GradientInput";
 import { CodePreview } from "./CodePreview";
+import { SuggestionsPanel } from "./SuggestionsPanel";
 import type { TangentValue } from "../types";
 
 const EASING_KEYWORDS = [
@@ -591,6 +592,8 @@ export function ControlPanel() {
           </div>
 
           {showCode && <CodePreview registrations={registrations} />}
+
+          <SuggestionsPanel />
 
           <div style={styles.footer}>
             {hasUnsavedChanges ? (

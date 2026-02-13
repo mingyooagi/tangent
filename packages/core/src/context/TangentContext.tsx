@@ -417,6 +417,111 @@ function TangentProviderDev({ children, endpoint }: TangentProviderProps) {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [undo, redo, saveAll]);
 
+  // ─── Subscribe to server events (agent-driven updates) ──
+  const updateValueRef = useRef(updateValue);
+  updateValueRef.current = updateValue;
+
+  useEffect(() => {
+    const eventsUrl = endpoint!.replace(/\/update$/, "/events");
+    let es: EventSource | null = null;
+    try {
+      es = new EventSource(eventsUrl);
+
+      es.addEventListener("value.changed", (e) => {
+        try {
+          const event = JSON.parse(e.data);
+          // Only apply agent-originated changes to avoid echo loops
+          if (event.source === "agent" && event.payload) {
+            const { id, key, newValue } = event.payload;
+            if (id && key && newValue !== undefined) {
+              updateValueRef.current(id, key, newValue, true);
+            }
+          }
+        } catch { /* ignore parse errors */ }
+      });
+
+      es.addEventListener("inspect.requested", (e) => {
+        try {
+          const event = JSON.parse(e.data);
+          const selector = event.payload?.selector;
+          if (selector) {
+            const el = document.querySelector(selector) as HTMLElement | null;
+            if (el) {
+              // Dynamically import to avoid circular dependency
+              const rect = el.getBoundingClientRect();
+              const computed = window.getComputedStyle(el);
+              const tunableProps = [
+                "padding", "margin", "fontSize", "lineHeight", "borderRadius",
+                "color", "backgroundColor", "borderColor", "opacity", "boxShadow",
+                "width", "height", "gap", "letterSpacing", "borderWidth",
+              ];
+              const computedStyles: Record<string, string> = {};
+              const suggestedProperties: Array<{ key: string; value: string | number; type: string; cssProperty: string }> = [];
+
+              for (const prop of tunableProps) {
+                const cssProp = prop.replace(/[A-Z]/g, m => `-${m.toLowerCase()}`);
+                const val = computed.getPropertyValue(cssProp);
+                if (val && val !== "none" && val !== "normal" && val !== "auto" && val !== "rgba(0, 0, 0, 0)") {
+                  computedStyles[prop] = val;
+                  const num = parseFloat(val);
+                  if (!isNaN(num) && num !== 0) {
+                    suggestedProperties.push({ key: prop, value: num, type: "number", cssProperty: prop });
+                  } else if (val.startsWith("#") || val.startsWith("rgb") || val.startsWith("hsl")) {
+                    suggestedProperties.push({ key: prop, value: val, type: "color", cssProperty: prop });
+                  }
+                }
+              }
+
+              // Build element path
+              const parts: string[] = [];
+              let cur: HTMLElement | null = el;
+              while (cur && cur !== document.body) {
+                let sel = cur.tagName.toLowerCase();
+                if (cur.id) sel += `#${cur.id}`;
+                else if (cur.className && typeof cur.className === "string") {
+                  const cls = cur.className.trim().split(/\s+/).slice(0, 2).join(".");
+                  if (cls) sel += `.${cls}`;
+                }
+                parts.unshift(sel);
+                cur = cur.parentElement;
+              }
+              parts.unshift("body");
+
+              // Post result back
+              const resultEndpoint = endpoint!.replace(/\/update$/, "/events");
+              fetch(resultEndpoint, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  type: "discovery.inspected",
+                  source: "agent",
+                  payload: {
+                    elementPath: parts.join(" > "),
+                    element: el.tagName.toLowerCase(),
+                    cssClasses: typeof el.className === "string" ? el.className : "",
+                    computedStyles,
+                    boundingBox: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
+                    suggestedProperties,
+                  },
+                }),
+              }).catch(() => {});
+            }
+          }
+        } catch { /* ignore */ }
+      });
+
+      es.onerror = () => {
+        // SSE connection lost — will auto-reconnect
+      };
+    } catch {
+      // EventSource not available or endpoint unreachable
+    }
+
+    return () => {
+      es?.close();
+    };
+  }, [endpoint]);
+
   // ─── Sync registrations to dev server (for MCP) ────────
   const syncTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
 
