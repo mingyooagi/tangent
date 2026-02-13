@@ -1,25 +1,50 @@
 # Tangent
 
-Visual Tuner for AI-generated code. Adjust UI values in the browser and save changes directly to source files.
+**The human-agent collaborative UI tuner.** Adjust values in the browser or let AI agents drive changes — both are first-class participants in the same tuning loop.
 
 ![Tangent Demo](./assets/tangent.gif)
 
+## Why Tangent?
+
+Most visual editors are built for humans, with agent support bolted on as an afterthought. Tangent is designed so that **humans and AI agents are equal input endpoints** to a shared tuning protocol. A human drags a slider; an agent calls `tangent_update_value`. Both produce the same structured event, both see each other's changes in real time, and both can save to source.
+
+```
+        Human (Control Panel)          Agent (MCP Server)
+                │                              │
+                ▼                              ▼
+         ┌─────────────────────────────────────────┐
+         │         Tangent Tuning Protocol          │
+         │     (structured events + SSE sync)       │
+         └──────────────┬──────────────────────────┘
+                        │
+              ┌─────────┴─────────┐
+              ▼                   ▼
+        Browser (live)      Source (AST write)
+```
+
 ## Features
 
+### For Humans
 - 🎛️ **Visual Controls** - Sliders, color pickers, gradient editors, box-shadow editors, and more
 - 💾 **Save to Source** - Click Save or ⌘S to write changes back to source files via AST modification
 - ⚡ **Hot Reload** - See changes instantly in the browser
-- 🎨 **Cyberpunk Theme** - Dark mode UI that stays out of your way
-- 📋 **Copy Prompt** - Copy changes in AI-friendly format
-- 🔧 **Framework Support** - Works with Vite and Next.js
 - ↩️ **Undo/Redo** - Full history support with keyboard shortcuts
 - 📱 **Responsive Preview** - Test layouts at different viewport sizes
 - 🔍 **Search & Filter** - Quickly find controls in large projects
-- 🔦 **Element Highlighting** - Hover elements in your app to highlight them in the control panel
 - 📐 **Spacing Overlay** - Visualize margins and padding
-- 🤖 **MCP Server** - Let AI agents read and update tuning values via Model Context Protocol
 - ◎ **Discovery Mode** - Click any element to inspect its CSS and discover tunable properties
-- 📡 **Structured Tuning Schema** - Portable event format for webhooks, MCP, and third-party integrations
+
+### For Agents
+- 🤖 **MCP Server** - 8 tools for AI agents to read, update, inspect, and suggest tuning values
+- 🔄 **Real-Time SSE Sync** - Agent changes appear live in the browser; human changes stream to the agent
+- 💡 **Agent Suggestions** - Agent proposes values with reasoning; human accepts or rejects in the panel
+- 🔎 **Agent-Driven Discovery** - Agent can inspect any element by CSS selector without human interaction
+- 🏷️ **Event Attribution** - Every event carries `source: "human" | "agent"` so both sides know who changed what
+
+### Shared Infrastructure
+- 📡 **Tuning Schema** - Portable event format consumed by MCP, webhooks, and third-party tools
+- 🔧 **Framework Support** - Vite and Next.js
+- 🎨 **Cyberpunk Theme** - Dark mode UI that stays out of your way
 
 ## Installation
 
@@ -270,10 +295,11 @@ npx tangent-mcp --url http://localhost:3000
 | ---- | ----------- |
 | `tangent_list_registrations` | List all registered components and their tunable properties |
 | `tangent_get_values` | Get current values for a specific component |
-| `tangent_update_value` | Update a tuning value (live preview, not saved to source) |
+| `tangent_update_value` | Update a tuning value — change is applied **live in the browser** via SSE |
 | `tangent_save_all` | Save all unsaved changes to source files via AST |
-| `tangent_watch_changes` | Block until new tuning events appear, then return batch |
-| `tangent_suggest_value` | Suggest a value change with reasoning (bidirectional) |
+| `tangent_watch_changes` | Poll for new tuning events since a given sequence number |
+| `tangent_suggest_value` | Suggest a value change with reasoning — user sees it in the panel and can Accept/Reject |
+| `tangent_inspect_element` | Inspect any element by CSS selector — returns computed styles and tunable properties |
 | `tangent_health` | Check dev server connectivity and status |
 
 ### Example: AI-Assisted Tuning
@@ -281,36 +307,43 @@ npx tangent-mcp --url http://localhost:3000
 Once connected, you can ask your AI agent things like:
 
 - *"What components are available for tuning?"* — calls `tangent_list_registrations`
-- *"Set the hero font size to 56px"* — calls `tangent_update_value`
+- *"Set the hero font size to 56px"* — calls `tangent_update_value`, browser updates live
+- *"What styles does `.hero > h1` have?"* — calls `tangent_inspect_element`
+- *"The card border radius should be 16px for design system consistency"* — calls `tangent_suggest_value`, user sees suggestion with Accept/Reject
 - *"Save all my changes"* — calls `tangent_save_all`
-- *"The card border radius should be 16px for consistency with the design system"* — calls `tangent_suggest_value` with reasoning
 
 ### Server-Side API
 
-The Vite plugin exposes REST endpoints that the MCP server consumes:
+The Vite plugin exposes REST + SSE endpoints that the MCP server and browser both consume:
 
 | Endpoint | Method | Description |
 | -------- | ------ | ----------- |
 | `/__tangent/health` | GET | Server status with registration and event counts |
 | `/__tangent/registrations` | GET | All component registrations with current values |
 | `/__tangent/registrations/:id` | GET | Single component registration |
-| `/__tangent/events` | GET | SSE event stream (real-time) |
-| `/__tangent/suggestions` | GET/POST | Agent suggestions (bidirectional) |
+| `/__tangent/events` | GET | SSE event stream (no query) or JSON polling (`?since=N`) |
+| `/__tangent/events` | POST | Submit an event (browser or agent) |
+| `/__tangent/suggestions` | GET/POST | Agent suggestions — supports `?status=pending` filter |
+| `/__tangent/suggestions/:id` | PATCH | Accept or reject a suggestion (`{ "status": "accepted" }`) |
+| `/__tangent/inspect` | POST | Request browser to inspect an element (`{ "selector": ".hero" }`) |
 
 ## Tuning Schema
 
-Tangent defines a structured event format for tuning operations. This enables webhooks, MCP integration, and third-party tools to consume tuning data.
+Tangent defines a structured event format for tuning operations. Every event carries a `source` field (`"human"` or `"agent"`) so you always know who initiated a change.
 
 ### Event Types
 
-| Event | Emitted When |
-| ----- | ------------ |
-| `registration.added` | A component registers with `useTangent()` |
-| `registration.removed` | A component unmounts |
-| `value.changed` | A tuning value is modified (slider, input, etc.) |
-| `value.saved` | A value is written to the source file |
-| `value.reset` | A section is reset to source values |
-| `discovery.inspected` | An element is inspected in Discovery Mode |
+| Event | Source | Emitted When |
+| ----- | ------ | ------------ |
+| `registration.added` | human | A component registers with `useTangent()` |
+| `registration.removed` | human | A component unmounts |
+| `value.changed` | both | A tuning value is modified — by slider or by agent |
+| `value.saved` | both | A value is written to the source file |
+| `value.reset` | human | A section is reset to source values |
+| `discovery.inspected` | both | An element is inspected (click or agent `tangent_inspect_element`) |
+| `suggestion.created` | agent | Agent submits a value suggestion |
+| `suggestion.accepted` | human | User accepts an agent suggestion |
+| `suggestion.rejected` | human | User rejects an agent suggestion |
 
 ### Subscribing to Events
 
@@ -318,7 +351,8 @@ Tangent defines a structured event format for tuning operations. This enables we
 import { onTuningEvent } from "tangent-core";
 
 const unsubscribe = onTuningEvent((event) => {
-  console.log(event.type, event.payload);
+  console.log(event.source, event.type, event.payload);
+  // event.source: "human" | "agent"
   // event.type: "value.changed"
   // event.payload: { id, filePath, key, oldValue, newValue, valueType }
 });
@@ -331,6 +365,7 @@ const unsubscribe = onTuningEvent((event) => {
 ```ts
 import type {
   TuningEvent,
+  TuningEventSource,
   TuningProperty,
   TuningSession,
   ValueChangedPayload,
@@ -341,10 +376,20 @@ import type {
 
 ## How It Works
 
+### Human Flow
 1. `useTangent` registers tunable values with the control panel
-2. When you adjust a value, Tangent sends a request to the dev server
-3. The server uses AST modification (via [magicast](https://github.com/unjs/magicast)) to update the source file
+2. You adjust a value via slider/picker; Tangent emits a `value.changed` event (`source: "human"`)
+3. Click Save — the server uses AST modification (via [magicast](https://github.com/unjs/magicast)) to update the source file
 4. Your bundler's HMR picks up the change and hot reloads
+
+### Agent Flow
+1. Agent calls `tangent_update_value` via MCP; server records a `value.changed` event (`source: "agent"`)
+2. Browser receives the event over SSE and applies it live — no page reload needed
+3. Agent calls `tangent_save_all` to persist changes to source via the same AST pipeline
+4. Agent can also call `tangent_suggest_value` — user sees the suggestion in the panel and decides
+
+### The Loop
+Both flows produce the same `TuningEvent` objects on the same event bus. The `source` field lets each side know who initiated the change. This means an agent can watch what a human is tuning (`tangent_watch_changes`), offer suggestions in real time, and the human can accept or reject them without leaving the browser.
 
 ## API
 
@@ -502,6 +547,10 @@ When reporting bugs, please include:
 - Steps to reproduce
 - Expected vs actual behavior
 
+## Agent Skill
+
+Tangent ships with a [Cursor Skill](./skills/tangent/SKILL.md) that teaches AI agents how to use Tangent when helping you build UI. Install it so your agent automatically wraps visual properties in `useTangent()`, uses Discovery Mode to identify tunable values, and connects via MCP for real-time collaboration.
+
 ## Packages
 
 | Package               | Description                                          |
@@ -509,7 +558,7 @@ When reporting bugs, please include:
 | `tangent-core`        | React hooks, UI components, schema, and event bus    |
 | `vite-plugin-tangent` | Vite plugin with dev server middleware and state API  |
 | `next-plugin-tangent` | Next.js plugin with API route handlers               |
-| `tangent-mcp`         | MCP server for AI agent integration                  |
+| `tangent-mcp`         | MCP server for AI agent integration (8 tools)        |
 | `tangent-transform`   | Shared source code transformation logic              |
 
 ## License
