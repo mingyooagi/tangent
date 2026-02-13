@@ -551,18 +551,10 @@ When reporting bugs, please include:
 
 Tangent ships with a [Cursor Skill](./skills/tangent/SKILL.md) that teaches AI agents how to use Tangent when helping you build UI. Once installed, your agent automatically wraps visual properties in `useTangent()`, uses Discovery Mode to identify tunable values, and connects via MCP for real-time collaboration.
 
-### Install in Cursor
-
-Copy the skill folder into your Cursor skills directory:
+### Install
 
 ```bash
-cp -r skills/tangent ~/.cursor/skills/tangent
-```
-
-Or clone and symlink:
-
-```bash
-ln -s $(pwd)/skills/tangent ~/.cursor/skills/tangent
+npx skills add mingyouagi/tangent
 ```
 
 After installing, the skill activates automatically when you:
