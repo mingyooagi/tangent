@@ -163,7 +163,7 @@ function TangentProviderDev({ children, endpoint }: TangentProviderProps) {
   }, []);
 
   const updateValue = useCallback(
-    (id: string, key: string, value: TangentValue, skipHistory = false) => {
+    (id: string, key: string, value: TangentValue, skipHistory = false, skipEmit = false) => {
       const registration = registrations.get(id);
       const oldValue = registration?.currentConfig[key];
 
@@ -188,8 +188,8 @@ function TangentProviderDev({ children, endpoint }: TangentProviderProps) {
         return next;
       });
 
-      // Emit value changed event
-      if (registration && oldValue !== value) {
+      // Emit value changed event (skip when applying agent SSE to avoid echo)
+      if (!skipEmit && registration && oldValue !== value) {
         emitTuningEvent("value.changed", {
           id,
           filePath: registration.filePath,
@@ -434,7 +434,8 @@ function TangentProviderDev({ children, endpoint }: TangentProviderProps) {
           if (event.source === "agent" && event.payload) {
             const { id, key, newValue } = event.payload;
             if (id && key && newValue !== undefined) {
-              updateValueRef.current(id, key, newValue, true);
+              // skipHistory=true, skipEmit=true to avoid echo events
+              updateValueRef.current(id, key, newValue, true, true);
             }
           }
         } catch { /* ignore parse errors */ }
