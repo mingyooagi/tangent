@@ -554,7 +554,7 @@ Tangent ships with a [Cursor Skill](./skills/tangent/SKILL.md) that teaches AI a
 ### Install
 
 ```bash
-npx skills add mingyouagi/tangent
+npx skills add mingyooagi/tangent
 ```
 
 After installing, the skill activates automatically when you:
