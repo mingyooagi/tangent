@@ -19,6 +19,7 @@ import { ControlPanel } from "../components/ControlPanel";
 import { SpacingOverlay } from "../components/SpacingOverlay";
 import { HighlightOverlay } from "../components/HighlightOverlay";
 import { ResponsivePreview } from "../components/ResponsivePreview";
+import { DiscoveryOverlay } from "../components/DiscoveryOverlay";
 import { getStoredConfig, setStoredConfig, updateStoredConfig } from "../store";
 import {
   pushHistory,
@@ -26,6 +27,11 @@ import {
   redo as redoHistory,
   getHistoryState,
 } from "../history";
+import {
+  emitTuningEvent,
+  onTuningEvent,
+  detectValueType,
+} from "../schema";
 
 const isDev = process.env.NODE_ENV === "development";
 
@@ -64,6 +70,8 @@ const prodContextValue: TangentContextValue = {
   isSaving: false,
   highlightedId: null,
   setHighlightedId: noopFn,
+  discoveryMode: false,
+  setDiscoveryMode: noopFn,
 };
 
 export function TangentProvider({
@@ -86,6 +94,7 @@ function TangentProviderDev({ children, endpoint }: TangentProviderProps) {
   const [isOpen, setIsOpen] = useState(true);
   const [showCode, setShowCode] = useState(false);
   const [showSpacing, setShowSpacing] = useState(false);
+  const [discoveryMode, setDiscoveryMode] = useState(false);
   const [viewport, setViewport] = useState<ViewportSize>("full");
   const [historyState, setHistoryState] = useState<HistoryState>({
     canUndo: false,
@@ -114,14 +123,39 @@ function TangentProviderDev({ children, endpoint }: TangentProviderProps) {
       next.set(registration.id, {
         ...registration,
         currentConfig: storedConfig ?? { ...registration.originalConfig },
-        sourceConfig: { ...registration.originalConfig }, // Track what's in source
+        sourceConfig: { ...registration.originalConfig },
       });
       return next;
+    });
+
+    // Emit registration event
+    const config = storedConfig ?? registration.originalConfig;
+    emitTuningEvent("registration.added", {
+      id: registration.id,
+      filePath: registration.filePath,
+      properties: Object.entries(config).map(([key, value]) => ({
+        key,
+        value,
+        type: detectValueType(value, key),
+        sourceValue: registration.originalConfig[key],
+      })),
     });
   }, []);
 
   const unregister = useCallback((id: string) => {
     setRegistrations((prev) => {
+      const reg = prev.get(id);
+      if (reg) {
+        emitTuningEvent("registration.removed", {
+          id: reg.id,
+          filePath: reg.filePath,
+          properties: Object.entries(reg.currentConfig).map(([key, value]) => ({
+            key,
+            value,
+            type: detectValueType(value, key),
+          })),
+        });
+      }
       const next = new Map(prev);
       next.delete(id);
       return next;
@@ -133,7 +167,7 @@ function TangentProviderDev({ children, endpoint }: TangentProviderProps) {
       const registration = registrations.get(id);
       const oldValue = registration?.currentConfig[key];
 
-      if (!skipHistory && oldValue !== value) {
+      if (!skipHistory && oldValue !== undefined && oldValue !== value) {
         pushHistory(id, key, oldValue, value);
         updateHistoryState();
       }
@@ -153,6 +187,18 @@ function TangentProviderDev({ children, endpoint }: TangentProviderProps) {
         }
         return next;
       });
+
+      // Emit value changed event
+      if (registration && oldValue !== value) {
+        emitTuningEvent("value.changed", {
+          id,
+          filePath: registration.filePath,
+          key,
+          oldValue: oldValue as string | number | boolean,
+          newValue: value,
+          valueType: detectValueType(value, key),
+        });
+      }
     },
     [registrations, updateHistoryState],
   );
@@ -184,6 +230,13 @@ function TangentProviderDev({ children, endpoint }: TangentProviderProps) {
         const reg = registrations.get(change.id);
         if (reg) {
           await reg.onSave(change.key, change.newValue);
+          // Emit save event per key
+          emitTuningEvent("value.saved", {
+            id: change.id,
+            filePath: reg.filePath,
+            key: change.key,
+            value: change.newValue,
+          });
         }
       }
 
@@ -264,6 +317,13 @@ function TangentProviderDev({ children, endpoint }: TangentProviderProps) {
         }
         return next;
       });
+
+      // Emit reset event
+      emitTuningEvent("value.reset", {
+        id,
+        filePath: reg.filePath,
+        keys: Object.keys(reg.sourceConfig),
+      });
     },
     [registrations],
   );
@@ -287,11 +347,11 @@ function TangentProviderDev({ children, endpoint }: TangentProviderProps) {
             ...reg,
             currentConfig: {
               ...reg.currentConfig,
-              [entry.key]: entry.oldValue as TangentValue,
+              [entry.key]: entry.oldValue,
             },
           };
           next.set(entry.id, updated);
-          reg.onUpdate(entry.key, entry.oldValue as TangentValue);
+          reg.onUpdate(entry.key, entry.oldValue);
         }
         return next;
       });
@@ -311,11 +371,11 @@ function TangentProviderDev({ children, endpoint }: TangentProviderProps) {
             ...reg,
             currentConfig: {
               ...reg.currentConfig,
-              [entry.key]: entry.newValue as TangentValue,
+              [entry.key]: entry.newValue,
             },
           };
           next.set(entry.id, updated);
-          reg.onUpdate(entry.key, entry.newValue as TangentValue);
+          reg.onUpdate(entry.key, entry.newValue);
         }
         return next;
       });
@@ -346,11 +406,69 @@ function TangentProviderDev({ children, endpoint }: TangentProviderProps) {
         e.preventDefault();
         redo();
       }
+      // Cmd+Shift+D to toggle discovery mode
+      if (e.key === "d" && (e.metaKey || e.ctrlKey) && e.shiftKey) {
+        e.preventDefault();
+        setDiscoveryMode((prev) => !prev);
+      }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [undo, redo, saveAll]);
+
+  // ─── Sync registrations to dev server (for MCP) ────────
+  const syncTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
+
+  useEffect(() => {
+    // Debounced sync of registration state to the server
+    if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
+
+    syncTimeoutRef.current = setTimeout(() => {
+      const syncData = Array.from(registrations.entries()).map(([id, reg]) => ({
+        id,
+        filePath: reg.filePath,
+        properties: Object.entries(reg.currentConfig).map(([key, value]) => ({
+          key,
+          value,
+          type: detectValueType(value, key),
+          sourceValue: reg.sourceConfig[key],
+        })),
+        hasUnsavedChanges: Object.keys(reg.currentConfig).some(
+          (k) => reg.currentConfig[k] !== reg.sourceConfig[k],
+        ),
+      }));
+
+      // Derive sync endpoint from the update endpoint
+      const syncEndpoint = endpoint!.replace(/\/update$/, "/sync");
+      fetch(syncEndpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ registrations: syncData }),
+      }).catch(() => {
+        // Silently fail — MCP server may not be running
+      });
+    }, 300);
+
+    return () => {
+      if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
+    };
+  }, [registrations, unsavedChanges, endpoint]);
+
+  // ─── Forward schema events to dev server (for MCP SSE) ─
+  useEffect(() => {
+    const eventsEndpoint = endpoint!.replace(/\/update$/, "/events");
+    const unsubscribe = onTuningEvent((event) => {
+      fetch(eventsEndpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(event),
+      }).catch(() => {
+        // Silently fail
+      });
+    });
+    return unsubscribe;
+  }, [endpoint]);
 
   const contextValue: TangentContextValue = {
     registrations,
@@ -377,6 +495,8 @@ function TangentProviderDev({ children, endpoint }: TangentProviderProps) {
     isSaving,
     highlightedId,
     setHighlightedId,
+    discoveryMode,
+    setDiscoveryMode,
   };
 
   return (
@@ -391,6 +511,7 @@ function TangentProviderDev({ children, endpoint }: TangentProviderProps) {
       {isOpen && registrations.size > 0 && <ControlPanel />}
       <HighlightOverlay />
       <SpacingOverlay enabled={showSpacing} />
+      <DiscoveryOverlay enabled={discoveryMode} />
     </TangentContext.Provider>
   );
 }

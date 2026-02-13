@@ -113,6 +113,8 @@ export function ControlPanel() {
     setShowCode,
     showSpacing,
     setShowSpacing,
+    discoveryMode,
+    setDiscoveryMode,
     viewport,
     setViewport,
     historyState,
@@ -395,6 +397,19 @@ export function ControlPanel() {
               >
                 ⬚
               </button>
+              <button
+                style={{
+                  ...styles.iconButton,
+                  backgroundColor: discoveryMode
+                    ? "rgba(0, 212, 255, 0.2)"
+                    : "transparent",
+                  color: discoveryMode ? "#00d4ff" : "#00d4ff",
+                }}
+                onClick={() => setDiscoveryMode(!discoveryMode)}
+                title="Discovery mode — click any element to inspect (⌘⇧D)"
+              >
+                ◎
+              </button>
               <div style={styles.viewportPicker}>
                 {(["mobile", "tablet", "desktop", "full"] as const).map(
                   (size) => (
@@ -584,7 +599,7 @@ export function ControlPanel() {
               </span>
             ) : (
               <span style={styles.shortcut}>
-                ⌘⇧T toggle · ⌘S save · drag to move
+                ⌘⇧T toggle · ⌘S save · ⌘⇧D discover · drag to move
               </span>
             )}
           </div>

@@ -1,8 +1,10 @@
+import type { TangentValue } from './types'
+
 interface HistoryEntry {
   id: string
   key: string
-  oldValue: unknown
-  newValue: unknown
+  oldValue: TangentValue
+  newValue: TangentValue
   timestamp: number
 }
 
@@ -10,7 +12,7 @@ const history: HistoryEntry[] = []
 let historyIndex = -1
 const MAX_HISTORY = 100
 
-export function pushHistory(id: string, key: string, oldValue: unknown, newValue: unknown): void {
+export function pushHistory(id: string, key: string, oldValue: TangentValue, newValue: TangentValue): void {
   // Remove any future entries if we're not at the end
   if (historyIndex < history.length - 1) {
     history.splice(historyIndex + 1)
