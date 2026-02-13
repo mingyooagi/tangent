@@ -1,6 +1,6 @@
 {
   "name": "tangent-core",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "React components and hooks for Tangent - Visual Tuner for AI-generated code",
   "type": "module",
   "main": "./dist/index.cjs",

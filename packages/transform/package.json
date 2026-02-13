@@ -1,6 +1,6 @@
 {
   "name": "tangent-transform",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Shared transform logic for Tangent - auto-inject filePath into useTangent calls",
   "type": "module",
   "main": "./dist/index.cjs",
