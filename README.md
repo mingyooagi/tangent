@@ -17,6 +17,9 @@ Visual Tuner for AI-generated code. Adjust UI values in the browser and save cha
 - 🔍 **Search & Filter** - Quickly find controls in large projects
 - 🔦 **Element Highlighting** - Hover elements in your app to highlight them in the control panel
 - 📐 **Spacing Overlay** - Visualize margins and padding
+- 🤖 **MCP Server** - Let AI agents read and update tuning values via Model Context Protocol
+- ◎ **Discovery Mode** - Click any element to inspect its CSS and discover tunable properties
+- 📡 **Structured Tuning Schema** - Portable event format for webhooks, MCP, and third-party integrations
 
 ## Installation
 
@@ -182,7 +185,9 @@ Visual editor for CSS box-shadows with:
 | `⌘⇧T` / `Ctrl+Shift+T` | Toggle control panel   |
 | `⌘Z` / `Ctrl+Z`        | Undo                   |
 | `⌘⇧Z` / `Ctrl+Shift+Z` | Redo                   |
+| `⌘S` / `Ctrl+S`        | Save all to source     |
 | `⌘⇧S` / `Ctrl+Shift+S` | Toggle spacing overlay |
+| `⌘⇧D` / `Ctrl+Shift+D` | Toggle discovery mode  |
 | `↑` / `↓`              | Adjust number ±1       |
 | `Shift + ↑` / `↓`      | Adjust number ±10      |
 
@@ -211,6 +216,128 @@ Test your layouts at different viewport sizes:
 | 📟   | Tablet  | 768px  |
 | 🖥   | Desktop | 1024px |
 | ⬜   | Full    | 100%   |
+
+## Discovery Mode
+
+Click the `◎` button or press `⌘⇧D` to enter Discovery Mode. This lets you click **any element** on the page to inspect its properties — no `useTangent()` required.
+
+When you click an element, a detail panel shows:
+
+- **CSS Selector** — The full DOM path (e.g. `body > div#root > main > .hero > h1`), useful for `grep`
+- **React Components** — The component hierarchy (e.g. `App > Hero > TangentRoot`)
+- **Tunable Properties** — CSS properties that can be turned into `useTangent()` parameters, with their current computed values and types
+
+This bridges the gap between "I want to tune this element" and "I need to write `useTangent()` code first" — you can explore what's tunable before committing to any code changes.
+
+## MCP Server (AI Agent Integration)
+
+Tangent includes an MCP (Model Context Protocol) server that lets AI coding agents read and update tuning values in real time.
+
+### Setup
+
+```bash
+npm install tangent-mcp
+```
+
+**Claude Code:**
+
+```bash
+claude mcp add tangent -- npx tangent-mcp
+```
+
+**Cursor** (`.cursor/mcp.json`):
+
+```json
+{
+  "mcpServers": {
+    "tangent": {
+      "command": "npx",
+      "args": ["tangent-mcp"]
+    }
+  }
+}
+```
+
+If your Vite dev server runs on a non-default port:
+
+```bash
+npx tangent-mcp --url http://localhost:3000
+```
+
+### MCP Tools
+
+| Tool | Description |
+| ---- | ----------- |
+| `tangent_list_registrations` | List all registered components and their tunable properties |
+| `tangent_get_values` | Get current values for a specific component |
+| `tangent_update_value` | Update a tuning value (live preview, not saved to source) |
+| `tangent_save_all` | Save all unsaved changes to source files via AST |
+| `tangent_watch_changes` | Block until new tuning events appear, then return batch |
+| `tangent_suggest_value` | Suggest a value change with reasoning (bidirectional) |
+| `tangent_health` | Check dev server connectivity and status |
+
+### Example: AI-Assisted Tuning
+
+Once connected, you can ask your AI agent things like:
+
+- *"What components are available for tuning?"* — calls `tangent_list_registrations`
+- *"Set the hero font size to 56px"* — calls `tangent_update_value`
+- *"Save all my changes"* — calls `tangent_save_all`
+- *"The card border radius should be 16px for consistency with the design system"* — calls `tangent_suggest_value` with reasoning
+
+### Server-Side API
+
+The Vite plugin exposes REST endpoints that the MCP server consumes:
+
+| Endpoint | Method | Description |
+| -------- | ------ | ----------- |
+| `/__tangent/health` | GET | Server status with registration and event counts |
+| `/__tangent/registrations` | GET | All component registrations with current values |
+| `/__tangent/registrations/:id` | GET | Single component registration |
+| `/__tangent/events` | GET | SSE event stream (real-time) |
+| `/__tangent/suggestions` | GET/POST | Agent suggestions (bidirectional) |
+
+## Tuning Schema
+
+Tangent defines a structured event format for tuning operations. This enables webhooks, MCP integration, and third-party tools to consume tuning data.
+
+### Event Types
+
+| Event | Emitted When |
+| ----- | ------------ |
+| `registration.added` | A component registers with `useTangent()` |
+| `registration.removed` | A component unmounts |
+| `value.changed` | A tuning value is modified (slider, input, etc.) |
+| `value.saved` | A value is written to the source file |
+| `value.reset` | A section is reset to source values |
+| `discovery.inspected` | An element is inspected in Discovery Mode |
+
+### Subscribing to Events
+
+```ts
+import { onTuningEvent } from "tangent-core";
+
+const unsubscribe = onTuningEvent((event) => {
+  console.log(event.type, event.payload);
+  // event.type: "value.changed"
+  // event.payload: { id, filePath, key, oldValue, newValue, valueType }
+});
+
+// Later: unsubscribe()
+```
+
+### Schema Types
+
+```ts
+import type {
+  TuningEvent,
+  TuningProperty,
+  TuningSession,
+  ValueChangedPayload,
+  DiscoveryInspectedPayload,
+  AgentSuggestion,
+} from "tangent-core";
+```
 
 ## How It Works
 
@@ -281,9 +408,10 @@ pnpm -C playground-next dev
 ```
 tangent/
 ├── packages/
-│   ├── core/           # React hooks and UI components
-│   ├── vite/           # Vite plugin
-│   ├── next/           # Next.js plugin
+│   ├── core/           # React hooks, UI components, schema, and event bus
+│   ├── vite/           # Vite plugin with dev server middleware and state API
+│   ├── next/           # Next.js plugin with API route handlers
+│   ├── mcp/            # MCP server for AI agent integration
 │   └── transform/      # Shared AST transformation logic
 ├── playground/         # Vite demo app
 └── playground-next/    # Next.js demo app
@@ -357,6 +485,8 @@ We welcome contributions! Here's how to get started:
 ### Ideas for Contributions
 
 - 🎨 **New input types** - Border radius editor, font picker, spacing editor
+- 🤖 **MCP enhancements** - Auto-tune mode, design system validation, accessibility audits
+- ◎ **Discovery Mode** - Auto-generate `useTangent()` code from inspected elements
 - 🌐 **Internationalization** - Translate UI text
 - ♿ **Accessibility** - Improve keyboard navigation and screen reader support
 - 📚 **Documentation** - Tutorials, examples, better API docs
@@ -374,12 +504,13 @@ When reporting bugs, please include:
 
 ## Packages
 
-| Package               | Description                             |
-| --------------------- | --------------------------------------- |
-| `tangent-core`        | React hooks and UI components           |
-| `vite-plugin-tangent` | Vite plugin with dev server middleware  |
-| `next-plugin-tangent` | Next.js plugin with API route handlers  |
-| `tangent-transform`   | Shared source code transformation logic |
+| Package               | Description                                          |
+| --------------------- | ---------------------------------------------------- |
+| `tangent-core`        | React hooks, UI components, schema, and event bus    |
+| `vite-plugin-tangent` | Vite plugin with dev server middleware and state API  |
+| `next-plugin-tangent` | Next.js plugin with API route handlers               |
+| `tangent-mcp`         | MCP server for AI agent integration                  |
+| `tangent-transform`   | Shared source code transformation logic              |
 
 ## License
 

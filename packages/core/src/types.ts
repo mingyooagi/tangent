@@ -50,7 +50,7 @@ export interface TangentContextValue {
   historyState: HistoryState;
   undo: () => void;
   redo: () => void;
-  // New: save functionality
+  // Save functionality
   unsavedChanges: UnsavedChange[];
   saveAll: () => Promise<void>;
   saveSection: (id: string) => Promise<void>;
@@ -59,4 +59,7 @@ export interface TangentContextValue {
   isSaving: boolean;
   highlightedId: string | null;
   setHighlightedId: (id: string | null) => void;
+  // Discovery mode
+  discoveryMode: boolean;
+  setDiscoveryMode: (enabled: boolean) => void;
 }
