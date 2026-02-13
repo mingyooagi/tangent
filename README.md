@@ -549,7 +549,27 @@ When reporting bugs, please include:
 
 ## Agent Skill
 
-Tangent ships with a [Cursor Skill](./skills/tangent/SKILL.md) that teaches AI agents how to use Tangent when helping you build UI. Install it so your agent automatically wraps visual properties in `useTangent()`, uses Discovery Mode to identify tunable values, and connects via MCP for real-time collaboration.
+Tangent ships with a [Cursor Skill](./skills/tangent/SKILL.md) that teaches AI agents how to use Tangent when helping you build UI. Once installed, your agent automatically wraps visual properties in `useTangent()`, uses Discovery Mode to identify tunable values, and connects via MCP for real-time collaboration.
+
+### Install in Cursor
+
+Copy the skill folder into your Cursor skills directory:
+
+```bash
+cp -r skills/tangent ~/.cursor/skills/tangent
+```
+
+Or clone and symlink:
+
+```bash
+ln -s $(pwd)/skills/tangent ~/.cursor/skills/tangent
+```
+
+After installing, the skill activates automatically when you:
+- Build or adjust React UI (styling, spacing, colors, gradients, shadows)
+- Say "tune", "adjust", or "tweak" UI values
+- Ask to set up Tangent or connect MCP
+- Use Discovery Mode to inspect elements
 
 ## Packages
 
